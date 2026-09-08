@@ -1,0 +1,41 @@
+# 跨机器宽松版（无 build 串，解析更灵活；版本仍钉死）
+# 用法: mamba env create -n RNA-seq -f RNA-seq.nobuilds.yaml
+name: RNA-seq
+channels:
+  - bioconda
+  - conda-forge
+  - defaults
+dependencies:
+  - hisat2=2.2.1
+  - stringtie=2.1.7
+  - subread=2.1.1
+  - samtools=1.5
+  - htslib=1.8
+  - gffread=0.12.7
+  - python=3.11.3
+  - pip=23.2.1
+  - setuptools=68.0.0
+  - wheel=0.38.4
+  - bowtie=1.0.0
+  - trimmomatic=0.39
+  - trinity=2.1.1
+  - jellyfish=2.2.10
+  - parafly=r2013_01_21
+  - fastool=0.1.4
+  - slclust=02022010
+  - collectl=4.0.4
+  - openjdk=8.0.121
+  - perl=5.34.0
+  - perl-threaded=5.32.1
+  - bzip2=1.0.8
+  - ca-certificates
+  - openssl=1.1.1w
+  - zlib
+  - xz
+  - sqlite
+  - tk
+  - ncurses
+  - readline
+  - libffi
+  - libcurl
+  - libdeflate
