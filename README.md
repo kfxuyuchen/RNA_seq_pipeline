@@ -14,7 +14,8 @@
 | `map_only.sh` | HISAT2 比对（`--dta --mm`）→ sorted BAM |
 | `post_stringtie.sh` | StringTie `-e` → count/TPM/FPKM 矩阵 |
 | `post_featurecounts.sh` | featureCounts → count/FPKM/TPM |
-| `counts_to_fpkm_tpm.py` | 由 featureCounts 矩阵计算 FPKM/TPM（Python 3） |
+| `counts_to_fpkm_tpm.py` | 由 featureCounts 矩阵计算 FPKM/TPM（Python 3；输出按 gene_id 排序） |
+| `sort_expr_matrix.py` | 按首列 ID 对矩阵行排序（StringTie 路径在 post 末尾调用） |
 | `prepDE.py` / `getTPM.py` / `getFPKM.py` | StringTie GTF 汇总矩阵（需系统 **python2**） |
 | `RNA.yaml` | conda 环境（含 hisat2 / stringtie / subread / gffread） |
 | `RNA-seq.nobuilds.yaml` | 跨机器宽松版环境文件 |

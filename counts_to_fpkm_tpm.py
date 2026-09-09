@@ -89,6 +89,14 @@ def main():
     genes, lengths, samples, counts = read_featurecounts(inp)
     fpkm, tpm = to_fpkm_tpm(counts, lengths)
 
+    # Stable lexicographic gene_id order (matches StringTie post-sort)
+    order = sorted(range(len(genes)), key=lambda i: genes[i])
+    genes = [genes[i] for i in order]
+    lengths = [lengths[i] for i in order]
+    counts = [counts[i] for i in order]
+    fpkm = [fpkm[i] for i in order]
+    tpm = [tpm[i] for i in order]
+
     write_matrix(out / f"{args.prefix}_count.tsv", genes, samples, counts, fmt="int")
     write_matrix(out / f"{args.prefix}_FPKM.tsv", genes, samples, fpkm)
     write_matrix(out / f"{args.prefix}_TPM.tsv", genes, samples, tpm)

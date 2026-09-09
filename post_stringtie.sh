@@ -11,6 +11,7 @@ force=0
 prepDE_script="${PIPELINE_DIR}/prepDE.py"
 getTPM_script="${PIPELINE_DIR}/getTPM.py"
 getFPKM_script="${PIPELINE_DIR}/getFPKM.py"
+sort_matrix_script="${PIPELINE_DIR}/sort_expr_matrix.py"
 
 usage() {
   echo "POST-StringTie v${VERSION} (断点续传)"
@@ -126,5 +127,17 @@ if [[ "$need_matrix" -eq 1 ]]; then
 
   echo "$new_stamp" > "$stamp"
 fi
+
+# 按 gene/transcript ID 字典序排行（样本列已在 sample_lst 中 sort）
+echo -e "\n=== 按 ID 排序矩阵行 ==="
+command -v python3 >/dev/null || { echo "ERROR: python3 required for sort_expr_matrix.py" >&2; exit 1; }
+[[ -f "$sort_matrix_script" ]] || { echo "ERROR: missing $sort_matrix_script" >&2; exit 1; }
+python3 "$sort_matrix_script" \
+  05.count_out/gene_count.csv \
+  05.count_out/transcript_count.csv \
+  06.TPM_out/gene_TPM.csv \
+  06.TPM_out/transcript_TPM.csv \
+  07.FPKM_out/gene_FPKM.csv \
+  07.FPKM_out/transcript_FPKM.csv
 
 echo -e "\n=== POST-StringTie 完成 ==="

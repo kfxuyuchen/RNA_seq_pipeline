@@ -97,7 +97,9 @@ if [[ "$force" -eq 0 \
   exit 0
 fi
 
-if featureCounts -h 2>&1 | grep -q -- '--countReadPairs'; then
+# featureCounts -h 常以非 0 退出；在 pipefail 下先落盘再 grep，避免误判
+fc_help=$(featureCounts -h 2>&1 || true)
+if grep -q -- '--countReadPairs' <<<"$fc_help"; then
   fc_extra=(-p --countReadPairs)
 else
   fc_extra=(-p)
