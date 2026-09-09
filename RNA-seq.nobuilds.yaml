@@ -13,6 +13,8 @@ dependencies:
   - htslib=1.8
   - gffread=0.12.7
   - python=3.11.3
+  # multiqc 可选：HTML 报告；未安装时 run_qc.sh 仍写 TSV
+  # - multiqc>=1.14
   - pip=23.2.1
   - setuptools=68.0.0
   - wheel=0.38.4

@@ -3,7 +3,11 @@
 # Incomplete intermediates are cleaned; finals written via tmp → mv.
 set -euo pipefail
 
-VERSION="2.1.0-map-resume"
+PIPELINE_DIR="$(cd "$(dirname "$0")" && pwd)"
+# shellcheck source=pipeline_common.sh
+source "${PIPELINE_DIR}/pipeline_common.sh"
+
+VERSION="2.2.0-map-resume"
 threads=20
 debug=0
 genome=""
@@ -12,10 +16,49 @@ tiegff=""
 force=0
 
 usage() {
-  echo "RNA-seq MAP-ONLY v${VERSION} (断点续传)"
-  echo "Usage: $(basename "$0") -G <genome.fa> -T <fastq_dir> [-t <gff>] [-p threads] [-d] [--force]"
-  echo "  已有合法 *_sorted.bam 的样本会跳过；中断产生的 *.tmp / 坏 BAM 会清理后重做"
-  echo "  --force  忽略已有 sorted BAM，全部重跑"
+  cat <<EOF
+RNA-seq MAP-ONLY v${VERSION}（断点续传）
+
+HISAT2 (--dta --mm) → unique (NH:i:1 + MAPQ≥10) → coordinate-sorted BAM。
+已有合法 *_sorted.bam 的样本自动跳过；中断产生的 *.tmp / 坏 BAM 会清理后重做。
+
+Usage:
+  $(basename "$0") -G <genome.fa> -T <fastq_dir> [options]
+
+必需:
+  -G, --genome PATH      参考基因组 FASTA
+  -T, --transdb DIR      PE FASTQ 目录
+
+可选:
+  -t, --tiegff PATH      注释 GFF（仅记录/兼容旧接口；比对本身不强制）
+  -p, --threads N        线程数 (默认: ${threads})
+  -d, --debug            保留 raw/unique 中间 BAM
+  --force                忽略已有 sorted BAM，全部重跑
+
+FASTQ 命名（提高跨项目兼容性）:
+  --r1-suffix STR        R1 后缀 (默认: ${R1_SUFFIX})
+  --r2-suffix STR        R2 后缀 (默认: ${R2_SUFFIX})
+  --r1-glob  GLOB        在 -T 目录下查找 R1 的 glob (默认: ${R1_GLOB})
+
+  默认兼容本实验室 *clean_1.fastq.gz / *clean_2.fastq.gz。
+  其它常见写法示例:
+    --r1-suffix _1.fq.gz --r2-suffix _2.fq.gz --r1-glob '*_1.fq.gz'
+    --r1-suffix _R1.fastq.gz --r2-suffix _R2.fastq.gz --r1-glob '*_R1.fastq.gz'
+
+环境变量:
+  SAMTOOLS_SORT_MEM      samtools sort -m (默认: 1G)
+
+输出:
+  01.ref/                  HISAT2 索引
+  03.stringtie_sort/       *_sorted.bam（下游定量共用）
+  08.align_stats/          raw/unique flagstat
+  02.hisat2-mapping/       debug 时保留 raw/unique BAM
+
+示例:
+  bash $(basename "$0") -G genome.fa -T clean_fastq -p 32
+  bash $(basename "$0") -G genome.fa -T fq \\
+    --r1-suffix _1.fq.gz --r2-suffix _2.fq.gz --r1-glob '*_1.fq.gz' -p 16
+EOF
   exit 1
 }
 
@@ -27,6 +70,9 @@ while [[ $# -gt 0 ]]; do
     -p|--threads) threads="$2"; shift 2 ;;
     -d|--debug) debug=1; shift ;;
     --force) force=1; shift ;;
+    --r1-suffix) R1_SUFFIX="$2"; shift 2 ;;
+    --r2-suffix) R2_SUFFIX="$2"; shift 2 ;;
+    --r1-glob) R1_GLOB="$2"; shift 2 ;;
     -h|--help) usage ;;
     *) echo "未知选项: $1" >&2; usage ;;
   esac
@@ -49,7 +95,6 @@ bam_ok() {
   if samtools quickcheck -q "$f" 2>/dev/null; then
     return 0
   fi
-  # fallback when quickcheck unavailable/fails: header readable
   samtools view -H "$f" >/dev/null 2>&1
 }
 
@@ -58,14 +103,24 @@ atomic_mv() {
   mv -f "$src" "$dst"
 }
 
-trans_files=$(find "$transdb" -maxdepth 1 -name "*clean_1.fastq.gz" -print | sort)
-[[ -n "$trans_files" ]] || { echo "ERROR: no *clean_1.fastq.gz in $transdb" >&2; exit 1; }
+trans_files=$(find_r1_files "$transdb")
+[[ -n "$trans_files" ]] || {
+  echo "ERROR: no files matching R1_GLOB='$R1_GLOB' in $transdb" >&2
+  echo "  hint: set --r1-glob / --r1-suffix to match your FASTQ names" >&2
+  exit 1
+}
+
+# PE mate preflight
+while IFS= read -r id; do
+  [[ -n "$id" ]] || continue
+  id2=$(fq_mate_path "$id") || exit 1
+  [[ -f "$id2" ]] || { echo "ERROR: missing mate for $(basename "$id"): $id2" >&2; exit 1; }
+done <<< "$trans_files"
 
 for dir in 01.ref 02.hisat2-mapping 03.stringtie_sort 08.align_stats; do
   mkdir -p "$dir"
 done
 
-# drop leftovers from killed jobs
 find 02.hisat2-mapping 03.stringtie_sort -name '*.tmp' -type f -delete 2>/dev/null || true
 
 genome=$(realpath "$genome")
@@ -76,8 +131,11 @@ genome_basename=$(basename "$genome")
 echo "=== MAP-ONLY v${VERSION} ==="
 echo "genome=$genome"
 echo "fastq=$transdb"
+echo "R1_GLOB=$R1_GLOB  R1_SUFFIX=$R1_SUFFIX  R2_SUFFIX=$R2_SUFFIX"
 echo "threads=$threads sort_mem=$sort_mem force=$force"
 echo "cwd=$(pwd)"
+n_r1=$(grep -c . <<<"$trans_files" || true)
+echo "R1 samples: $n_r1"
 
 echo -e "\n=== 步骤1: 参考索引 ==="
 if [[ ! -f "${ref_dir}/${genome_basename}.1.ht2l" && ! -f "${ref_dir}/${genome_basename}.1.ht2" ]]; then
@@ -93,7 +151,7 @@ n_done=0
 n_fail_clean=0
 while IFS= read -r id; do
   [[ -n "$id" ]] || continue
-  sample_name=$(basename "$id" "_1.fastq.gz")
+  sample_name=$(fq_sample_name "$id") || exit 1
   legacy_sam="02.hisat2-mapping/${sample_name}.sam"
   raw_bam="02.hisat2-mapping/${sample_name}_raw.bam"
   unique_bam="02.hisat2-mapping/${sample_name}_unique.bam"
@@ -107,7 +165,6 @@ while IFS= read -r id; do
     continue
   fi
 
-  # stale/corrupt final → remove and redo
   if [[ -f "$sorted_bam" ]] && ! bam_ok "$sorted_bam"; then
     echo "  损坏的 sorted BAM，删除重做: $sorted_bam"
     rm -f "$sorted_bam"
@@ -117,7 +174,6 @@ while IFS= read -r id; do
   echo "处理样本: $sample_name"
   rm -f "${raw_bam}.tmp" "${unique_bam}.tmp" "${sorted_bam}.tmp"
 
-  # raw BAM
   if bam_ok "$raw_bam"; then
     echo "  原始BAM已存在且有效，跳过比对"
   else
@@ -126,7 +182,7 @@ while IFS= read -r id; do
       samtools view -bS -@"${sam_threads}" "$legacy_sam" > "${raw_bam}.tmp"
       atomic_mv "${raw_bam}.tmp" "$raw_bam"
     else
-      id2="$(dirname "$id")/$(basename "$id" "_1.fastq.gz")_2.fastq.gz"
+      id2=$(fq_mate_path "$id") || exit 1
       [[ -f "$id2" ]] || { echo "ERROR: missing mate $id2" >&2; exit 1; }
       echo "  hisat2 → samtools view (pipe BAM) [-p ${threads}, --dta --mm]"
       hisat2 -x "${ref_dir}/${genome_basename}" -p "$threads" \
@@ -139,7 +195,6 @@ while IFS= read -r id; do
 
   [[ -f "$stats_raw" && -s "$stats_raw" ]] || samtools flagstat -@"${sam_threads}" "$raw_bam" > "$stats_raw"
 
-  # unique BAM
   if bam_ok "$unique_bam"; then
     echo "  unique BAM 已存在且有效，跳过筛选"
   else

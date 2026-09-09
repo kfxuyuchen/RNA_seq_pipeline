@@ -4,7 +4,7 @@
 set -euo pipefail
 
 PIPELINE_DIR="$(cd "$(dirname "$0")" && pwd)"
-VERSION="2.1.0-st-resume"
+VERSION="2.2.0-st-resume"
 threads=8
 tiegff=""
 force=0
@@ -14,10 +14,37 @@ getFPKM_script="${PIPELINE_DIR}/getFPKM.py"
 sort_matrix_script="${PIPELINE_DIR}/sort_expr_matrix.py"
 
 usage() {
-  echo "POST-StringTie v${VERSION} (断点续传)"
-  echo "Usage: $(basename "$0") -t <gff> [-p threads] [--force]"
-  echo "  已有 *.assemble.gtf 的样本跳过 StringTie"
-  echo "  矩阵在 GTF 集合变化时自动重算；--force 强制全部重做"
+  cat <<EOF
+POST-StringTie v${VERSION}（断点续传）
+
+对 03.stringtie_sort/*_sorted.bam 跑 StringTie -e，再汇总 count/TPM/FPKM。
+已有非空 *.assemble.gtf 的样本跳过；矩阵在样本 GTF 集合变化时重算。
+矩阵写出后按 gene/transcript ID 字典序排序。
+
+Usage:
+  $(basename "$0") -t <gff|gff3> [options]
+
+必需:
+  -t, --tiegff PATH      参考注释 GFF/GFF3
+
+可选:
+  -p, --threads N        总线程预算；内部并行数≈N/4 (默认: ${threads})
+  --force                强制重跑全部样本与矩阵
+  --prepDE/--getTPM/--getFPKM PATH   覆盖汇总脚本路径
+
+依赖:
+  stringtie, python2 (prepDE/getTPM/getFPKM), python3 (sort_expr_matrix.py)
+
+输出:
+  04.stringtie_out/<sample>/*.assemble.gtf
+  05.count_out/gene_count.csv  transcript_count.csv
+  06.TPM_out/gene_TPM.csv      transcript_TPM.csv
+  07.FPKM_out/gene_FPKM.csv    transcript_FPKM.csv
+
+示例:
+  bash $(basename "$0") -t genes.gff3 -p 32
+  bash $(basename "$0") -t genes.gff3 -p 16 --force
+EOF
   exit 1
 }
 
