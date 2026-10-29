@@ -3,12 +3,13 @@
 set -euo pipefail
 
 PIPELINE_DIR="$(cd "$(dirname "$0")" && pwd)"
-VERSION="1.0.0-qc"
+VERSION="1.1.0-qc"
 outdir="10.qc"
 work_root="."
 run_multiqc=1
 title="RNA-seq pipeline QC"
 min_assigned=50
+min_hisat2=0
 force_mq=0
 
 usage() {
@@ -25,16 +26,19 @@ Options:
   -C, --workdir DIR      流水线结果根目录 (默认: 当前目录)
   --title STR            MultiQC 报告标题
   --min-assigned PCT     Assigned% 告警阈值 (默认: ${min_assigned})
+  --min-hisat2 PCT       hisat2 overall% 告警阈值 (默认: ${min_hisat2}=关闭)
   --no-multiqc           只写 TSV，不跑 MultiQC
   --force-multiqc        MultiQC --force
   -h, --help             本帮助
 
 输入（相对 -C）:
   08.align_stats/*.flagstat.txt
+  08.align_stats/hisat2_alignment_rates.tsv
   09.featureCounts/gene_counts.txt.summary
 
 输出:
   10.qc/align_flagstat_summary.tsv
+  10.qc/hisat2_alignment_rates.tsv
   10.qc/featurecounts_summary.tsv
   10.qc/qc_overview.tsv
   10.qc/multiqc_report.html          (若安装了 multiqc)
@@ -55,6 +59,7 @@ while [[ $# -gt 0 ]]; do
     -C|--workdir) work_root="$2"; shift 2 ;;
     --title) title="$2"; shift 2 ;;
     --min-assigned) min_assigned="$2"; shift 2 ;;
+    --min-hisat2) min_hisat2="$2"; shift 2 ;;
     --no-multiqc) run_multiqc=0; shift ;;
     --force-multiqc) force_mq=1; shift ;;
     -h|--help) usage ;;
@@ -74,7 +79,8 @@ python3 "$PIPELINE_DIR/summarize_qc.py" \
   -o "$outdir" \
   --align-dir 08.align_stats \
   --fc-summary 09.featureCounts/gene_counts.txt.summary \
-  --min-assigned-pct "$min_assigned"
+  --min-assigned-pct "$min_assigned" \
+  --min-hisat2-pct "$min_hisat2"
 
 cfg="${outdir}/multiqc_config.yaml"
 cat > "$cfg" <<EOF

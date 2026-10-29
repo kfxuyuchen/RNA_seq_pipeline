@@ -2,9 +2,10 @@
 # Unified RNA-seq pipeline: one mapping, then StringTie and/or featureCounts.
 # All stages support resume (skip finished work; --force to redo).
 #
-#   HISAT2 (--dta --mm) → sorted BAM
+#   HISAT2 (--dta --mm) | unique | sort → 03.*_sorted.bam (default one-write)
+#     ├─ 02.*.hisat2.log
 #     ├─ StringTie -e → prepDE / getTPM / getFPKM   (04–07.*)
-#     └─ featureCounts → count / FPKM / TPM         (09.featureCounts/)
+#     ├─ featureCounts → count / FPKM / TPM         (09.featureCounts/)
 #     └─ QC tables + MultiQC                        (10.qc/)
 #
 set -euo pipefail
@@ -13,7 +14,7 @@ PIPELINE_DIR="$(cd "$(dirname "$0")" && pwd)"
 # shellcheck source=pipeline_common.sh
 source "${PIPELINE_DIR}/pipeline_common.sh"
 
-VERSION="3.2.0-dual-compat"
+VERSION="4.0.0"
 
 threads=12
 debug=0
@@ -23,8 +24,11 @@ genome=""
 transdb=""
 tiegff=""
 annot_gtf=""
+index_prefix=""
+index_bam=0
 skip_map=0
 run_qc=1
+min_hisat2=0
 
 # featureCounts passthrough
 fc_strand=0
@@ -80,17 +84,20 @@ Usage:
 
 ──────────────── 其它 ────────────────
   -p, --threads N        线程（默认: ${threads}）
-  -d, --debug            比对保留中间 BAM
+  -d, --debug            比对多步落盘并保留 02 中间 BAM（默认一次落盘）
+  -x, --index PREFIX     复用已有 HISAT2 索引前缀（传给 map_only）
+  --index-bam            对 sorted BAM 建 CSI 索引（小麦推荐）
   --force                强制重跑（向下传递）
   --no-qc                结束后不跑 10.qc / MultiQC
   --qc-only              仅对当前目录已有结果跑 QC（需在输出目录执行）
+  --min-hisat2 PCT       QC 时 hisat2 overall% 低于此值告警（默认 0=关闭）
   -h, --help             本帮助
 
 断点续传: 同一命令重新提交即可；已完成样本/步骤会跳过。
 
-输出目录约定:
-  01.ref/  03.stringtie_sort/  04–07.*  08.align_stats/
-  09.featureCounts/  10.qc/
+输出目录约定（编号连续）:
+  01.ref/  02.hisat2-mapping/  03.stringtie_sort/  04–07.*
+  08.align_stats/  09.featureCounts/  10.qc/
 
 示例:
   # 双路径 + 默认 clean FASTQ 命名
@@ -121,7 +128,10 @@ while [[ $# -gt 0 ]]; do
     -m|--mode) mode="$2"; shift 2 ;;
     -p|--threads) threads="$2"; shift 2 ;;
     -d|--debug) debug=1; shift ;;
+    -x|--index) index_prefix="$2"; shift 2 ;;
+    --index-bam) index_bam=1; shift ;;
     --force) force=1; shift ;;
+    --min-hisat2) min_hisat2="$2"; shift 2 ;;
     --r1-suffix) R1_SUFFIX="$2"; shift 2 ;;
     --r2-suffix) R2_SUFFIX="$2"; shift 2 ;;
     --r1-glob) R1_GLOB="$2"; shift 2 ;;
@@ -141,7 +151,7 @@ done
 
 if [[ "$qc_only" -eq 1 ]]; then
   echo "=== QC-only ==="
-  qc_args=(-o 10.qc)
+  qc_args=(-o 10.qc --min-assigned "$fc_min_assigned" --min-hisat2 "$min_hisat2")
   [[ -n "$qc_title" ]] && qc_args+=(--title "$qc_title")
   bash "$qc_script" "${qc_args[@]}"
   exit 0
@@ -193,15 +203,18 @@ if [[ "$skip_map" -eq 0 ]]; then
   map_args=(-G "$genome" -T "$transdb" -p "$threads"
             --r1-suffix "$R1_SUFFIX" --r2-suffix "$R2_SUFFIX" --r1-glob "$R1_GLOB")
   [[ -n "$tiegff" ]] && map_args+=(-t "$tiegff")
+  [[ -n "$index_prefix" ]] && map_args+=(-x "$index_prefix")
   [[ "$debug" -eq 1 ]] && map_args+=(-d)
+  [[ "$index_bam" -eq 1 ]] && map_args+=(--index-bam)
   [[ "$force" -eq 1 ]] && map_args+=(--force)
   bash "$map_script" "${map_args[@]}"
 fi
 
 if [[ "$mode" == "map" ]]; then
-  echo "mode=map：到此结束。BAM 在 03.stringtie_sort/"
+  echo "mode=map：到此结束。BAM=03.stringtie_sort/ 日志=02.hisat2-mapping/"
   if [[ "$run_qc" -eq 1 ]]; then
-    bash "$qc_script" -o 10.qc --title "${qc_title:-RNA-seq map-only QC}" || true
+    bash "$qc_script" -o 10.qc --min-assigned "$fc_min_assigned" --min-hisat2 "$min_hisat2" \
+      --title "${qc_title:-RNA-seq map-only QC}" || true
   fi
   exit 0
 fi
@@ -226,7 +239,7 @@ fi
 
 if [[ "$run_qc" -eq 1 ]]; then
   echo -e "\n########## QC / MultiQC ##########"
-  qc_args=(-o 10.qc --min-assigned "$fc_min_assigned")
+  qc_args=(-o 10.qc --min-assigned "$fc_min_assigned" --min-hisat2 "$min_hisat2")
   [[ -n "$qc_title" ]] && qc_args+=(--title "$qc_title")
   bash "$qc_script" "${qc_args[@]}" || echo "WARN: QC step reported issues (see above)"
 fi

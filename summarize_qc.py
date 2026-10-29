@@ -3,10 +3,12 @@
 
 Inputs (auto-detected under cwd or --outdir parent):
   08.align_stats/*_{raw,unique}.flagstat.txt
+  08.align_stats/hisat2_alignment_rates.tsv (or *_hisat2_rate.tsv)
   09.featureCounts/gene_counts.txt.summary
 
 Outputs:
   10.qc/align_flagstat_summary.tsv
+  10.qc/hisat2_alignment_rates.tsv
   10.qc/featurecounts_summary.tsv
   10.qc/qc_overview.tsv
 """
@@ -53,6 +55,7 @@ def main() -> None:
     ap.add_argument("--align-dir", default="08.align_stats")
     ap.add_argument("--fc-summary", default="09.featureCounts/gene_counts.txt.summary")
     ap.add_argument("--min-assigned-pct", type=float, default=50.0, help="warn if Assigned%% below this")
+    ap.add_argument("--min-hisat2-pct", type=float, default=0.0, help="warn if HISAT2 overall%% below this (0=off)")
     args = ap.parse_args()
 
     out = Path(args.outdir)
@@ -99,6 +102,55 @@ def main() -> None:
     ]
     write_tsv(out / "align_flagstat_summary.tsv", align_rows, align_cols)
     print(f"wrote {out / 'align_flagstat_summary.tsv'} rows={len(align_rows)}")
+
+    # ---- HISAT2 overall alignment rates ----
+    hisat_rows: list[dict] = []
+    rate_table = align_dir / "hisat2_alignment_rates.tsv"
+    rate_files = []
+    if rate_table.is_file():
+        rate_files = [rate_table]
+    else:
+        rate_files = sorted(align_dir.glob("*_hisat2_rate.tsv")) if align_dir.is_dir() else []
+    for rf in rate_files:
+        lines = rf.read_text().splitlines()
+        if not lines:
+            continue
+        # tolerate header
+        for line in lines[1:] if lines[0].startswith("sample") else lines:
+            parts = line.split("\t")
+            if len(parts) < 2:
+                continue
+            hisat_rows.append(
+                {
+                    "sample": parts[0],
+                    "overall_alignment_rate_pct": parts[1],
+                    "source_log": parts[2] if len(parts) > 2 else rf.name,
+                }
+            )
+    # de-dup by sample (last wins)
+    hisat_by_sample: dict[str, dict] = {}
+    for r in hisat_rows:
+        hisat_by_sample[r["sample"]] = r
+    hisat_rows = [hisat_by_sample[k] for k in sorted(hisat_by_sample)]
+    write_tsv(
+        out / "hisat2_alignment_rates.tsv",
+        hisat_rows,
+        ["sample", "overall_alignment_rate_pct", "source_log"],
+    )
+    print(f"wrote {out / 'hisat2_alignment_rates.tsv'} rows={len(hisat_rows)}")
+    if args.min_hisat2_pct > 0:
+        low_h = []
+        for r in hisat_rows:
+            try:
+                pct = float(r["overall_alignment_rate_pct"])
+            except ValueError:
+                continue
+            if pct < args.min_hisat2_pct:
+                low_h.append((r["sample"], pct))
+        if low_h:
+            print(f"WARN: {len(low_h)} sample(s) HISAT2 overall_pct < {args.min_hisat2_pct}")
+            for n, p in low_h:
+                print(f"  {n}: {p:.2f}%")
 
     # ---- featureCounts summary ----
     fc_rows = []
@@ -161,16 +213,18 @@ def main() -> None:
     else:
         print(f"NOTE: no featureCounts summary at {fc_path}")
 
-    # ---- overview join on unique align + fc ----
+    # ---- overview join on hisat2 rate + unique align + fc ----
     unique = {r["sample"]: r for r in align_rows if r["stage"] == "unique"}
     overview = []
-    samples = sorted(set(unique) | {r["sample"] for r in fc_rows})
+    samples = sorted(set(unique) | set(hisat_by_sample) | {r["sample"] for r in fc_rows})
     for s in samples:
         u = unique.get(s, {})
+        h = hisat_by_sample.get(s, {})
         f = next((r for r in fc_rows if r["sample"] == s), {})
         overview.append(
             {
                 "sample": s,
+                "hisat2_overall_pct": h.get("overall_alignment_rate_pct", ""),
                 "unique_mapped_pct": u.get("mapped_pct", ""),
                 "unique_properly_paired_pct": u.get("properly_paired_pct", ""),
                 "fc_Assigned_pct": f.get("Assigned_pct", ""),
@@ -180,7 +234,14 @@ def main() -> None:
     write_tsv(
         out / "qc_overview.tsv",
         overview,
-        ["sample", "unique_mapped_pct", "unique_properly_paired_pct", "fc_Assigned_pct", "fc_status"],
+        [
+            "sample",
+            "hisat2_overall_pct",
+            "unique_mapped_pct",
+            "unique_properly_paired_pct",
+            "fc_Assigned_pct",
+            "fc_status",
+        ],
     )
     print(f"wrote {out / 'qc_overview.tsv'} rows={len(overview)}")
 
