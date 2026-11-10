@@ -329,7 +329,7 @@ while IFS= read -r id; do
       else
         echo "  [debug] hisat2 → raw BAM [-p ${threads}, --dta --mm]"
         hisat2 -x "$hisat_x" -p "$threads" $hisat2_extra $mm_opt \
-          --dta --mm \
+          --dta \
           --fr -1 "$id" -2 "$id2" \
           2> "$hisat_log" \
           | samtools view -@"${sam_threads}" -bS - > "${raw_bam}.tmp"
@@ -382,7 +382,7 @@ while IFS= read -r id; do
       echo "  hisat2 | unique | sort → $sorted_bam [-p ${threads}, --dta --mm]"
       # shellcheck disable=SC2094
       hisat2 -x "$hisat_x" -p "$threads" $hisat2_extra $mm_opt \
-        --dta --mm \
+        --dta \
         --fr -1 "$id" -2 "$id2" \
         2> "$hisat_log" \
         | samtools view -h -q "$mapq_min" -@"${sam_threads}" - \
