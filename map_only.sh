@@ -8,8 +8,10 @@ PIPELINE_DIR="$(cd "$(dirname "$0")" && pwd)"
 # shellcheck source=pipeline_common.sh
 source "${PIPELINE_DIR}/pipeline_common.sh"
 
-VERSION="2.4.3"
+VERSION="2.5.0"
 threads=20
+only_samples=""
+sample_list_file=""
 debug=0
 genome=""
 transdb=""
@@ -46,6 +48,9 @@ Usage:
   -d, --debug            多步落盘并保留 raw/unique 中间 BAM
   --index-bam            对 sorted BAM 建 CSI 索引（samtools index -c；小麦超长染色体必须用 CSI，勿用默认 BAI）
   --force                忽略已有 sorted BAM，全部重跑
+  --only S1,S2           只处理指定样本（sample 名，不含 _clean_1 后缀）
+  --sample-list FILE     从文件读取样本名（一行一个），只处理这些样本
+                          用于 SLURM array：每个任务只映射一个样本
 
 FASTQ 命名（提高跨项目兼容性）:
   --r1-suffix STR        R1 后缀 (默认: ${R1_SUFFIX})
@@ -86,6 +91,8 @@ while [[ $# -gt 0 ]]; do
     -d|--debug) debug=1; shift ;;
     --index-bam) index_bam=1; shift ;;
     --force) force=1; shift ;;
+    --only) only_samples="$2"; shift 2 ;;
+    --sample-list) sample_list_file="$2"; shift 2 ;;
     --r1-suffix) R1_SUFFIX="$2"; shift 2 ;;
     --r2-suffix) R2_SUFFIX="$2"; shift 2 ;;
     --r1-glob) R1_GLOB="$2"; shift 2 ;;
@@ -107,6 +114,13 @@ fi
 
 # samtools 线程默认仍封顶 4（历史内存考虑）；可用 SAMTOOLS_THREADS 覆盖。
 # 注意 sort 内存 ≈ SAMTOOLS_THREADS × SAMTOOLS_SORT_MEM。
+only_filter="$only_samples"
+if [[ -n "$sample_list_file" ]]; then
+  [[ -f "$sample_list_file" ]] || { echo "ERROR: --sample-list 文件不存在: $sample_list_file" >&2; exit 1; }
+  _lines=$(sed '/^[[:space:]]*$/d' "$sample_list_file" | paste -sd, -)
+  only_filter="${only_filter:+$only_filter,}${_lines}"
+fi
+
 sam_threads="${SAMTOOLS_THREADS:-$(( threads > 4 ? 4 : threads ))}"
 sort_threads="$sam_threads"
 sort_mem="${SAMTOOLS_SORT_MEM:-1G}"
@@ -262,6 +276,13 @@ n_fail_clean=0
 while IFS= read -r id; do
   [[ -n "$id" ]] || continue
   sample_name=$(fq_sample_name "$id") || exit 1
+  if [[ -n "$only_filter" ]]; then
+    _base="${sample_name%_clean}"
+    case ",${only_filter}," in
+      *",${sample_name},"*|*",${_base},"*) ;;
+      *) continue ;;
+    esac
+  fi
   legacy_sam="02.hisat2-mapping/${sample_name}.sam"
   raw_bam="02.hisat2-mapping/${sample_name}_raw.bam"
   unique_bam="02.hisat2-mapping/${sample_name}_unique.bam"

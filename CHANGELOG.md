@@ -1,5 +1,17 @@
 # Changelog
 
+## 5.4.0 — 2026-11-10
+
+### Highlights
+- **按样本子集并行映射**：`map_only.sh` 新增 `--only S1,S2` 与 `--sample-list FILE`。
+- 新增 `templates/submit_map_array_amd.slurm` 与 `submit_map_array.sh`：
+  一个 SLURM array task 只映射一个样本，多任务共享 `--mm` page cache。
+- 适合“下载分批、先到先跑”的场景：映射并行，最后一次性 `post_featurecounts` 汇总。
+
+### Component versions
+- `map_only.sh` **2.5.0**
+- `RNA_seq_run_dual.sh` **5.3.0**
+
 ## 5.3.0 — 2026-11-10
 
 ### Highlights

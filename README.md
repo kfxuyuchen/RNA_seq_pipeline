@@ -43,6 +43,36 @@ clean PE FASTQ
 ---
 
 
+## 并行映射（v5.4.0+）
+
+样本多时不要顺序跑，用 SLURM array：一个 task 一个样本。
+
+```bash
+# 1) 样本名单（sample 名，不含 _clean 后缀）
+cat > samples.txt <<LIST
+sampleA
+sampleB
+sampleC
+LIST
+
+# 2) 提交 array，最多 8 个并发
+export OUTDIR=/path/to/rnaseq_quant
+export FASTQ_DIR=/path/to/clean_fastq
+export GENOME=/path/to/genome.fa
+export INDEX=/path/to/hisat2_prefix
+export SAMPLE_LIST=/path/to/samples.txt
+export THREADS=8
+export SAMTOOLS_THREADS=4
+export SAMTOOLS_SORT_MEM=1G
+sbatch --array=0-2%8 --export=ALL templates/submit_map_array_amd.slurm
+
+# 3) 全部映射完成后，一次性汇总
+cd "$OUTDIR"
+bash RNA_seq_run_dual.sh -m quant-only -t annotation.gff3 -a annotation.gtf -p 32
+```
+
+`--mm` 下多个 task 共享同一份索引 page cache，内存不会随并发数线性增长。
+
 ## 参数覆盖（v5.2.0+）
 
 默认口径与 252 样本项目一致；需要改变时不必改脚本，直接外部传参：
