@@ -3,8 +3,6 @@
 #SBATCH -p AMD_9A14,AMD_9654
 #SBATCH -c 12
 #SBATCH -t 2-00:00:00
-#SBATCH -o logs/map_array_%A_%a.out
-#SBATCH -e logs/map_array_%A_%a.err
 
 # Parallel mapping: one array task = one sample.
 # Required env:
