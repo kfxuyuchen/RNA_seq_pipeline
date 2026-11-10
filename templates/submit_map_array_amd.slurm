@@ -19,6 +19,9 @@ THREADS="${THREADS:-12}"
 export SAMTOOLS_THREADS="${SAMTOOLS_THREADS:-4}"
 export SAMTOOLS_SORT_MEM="${SAMTOOLS_SORT_MEM:-1G}"
 
+source /public/home/xuyuchen/miniconda3/etc/profile.d/conda.sh
+conda activate RNA-seq
+
 PIPE=/public/home/xuyuchen/local/RNA_seq_pipeline
 SAMPLE=$(sed -n "$((SLURM_ARRAY_TASK_ID + 1))p" "$SAMPLE_LIST")
 [[ -n "$SAMPLE" ]] || { echo "ERROR: empty sample at index ${SLURM_ARRAY_TASK_ID}" >&2; exit 1; }
