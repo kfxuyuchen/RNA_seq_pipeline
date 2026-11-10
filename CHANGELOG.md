@@ -1,5 +1,12 @@
 # Changelog
 
+## 5.6.2 — 2026-11-10
+
+### Fixes
+- 修复 StringTie 路线在 python2 下的 `SyntaxError: Non-ASCII character`：
+  `prepDE.py` / `getTPM.py` / `getFPKM.py` 第 2 行的中文 LEGACY 注释缺少编码声明，
+  现补 `# -*- coding: utf-8 -*-`。仅影响 StringTie 汇总，featureCounts 路线不受影响。
+
 ## 5.6.1 — 2026-11-10
 
 ### Fixes
