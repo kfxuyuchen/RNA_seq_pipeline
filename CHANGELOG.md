@@ -1,5 +1,12 @@
 # Changelog
 
+## 5.0.1 — 2026-11-10
+
+### Fixes
+- `map_only.sh` 的 `-x/--index` 不再对索引前缀做 symlink 解析：改用 `realpath -s`。
+  修复当参考 FASTA 是指向真实文件的软链接、索引放在软链接旁边时，`.1.ht2(l)` 找不到的问题。
+- `map_only.sh` **2.4.1**。
+
 ## 5.0.0 — 2026-11-10
 
 ### Highlights

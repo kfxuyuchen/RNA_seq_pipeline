@@ -8,7 +8,7 @@ PIPELINE_DIR="$(cd "$(dirname "$0")" && pwd)"
 # shellcheck source=pipeline_common.sh
 source "${PIPELINE_DIR}/pipeline_common.sh"
 
-VERSION="2.4.0"
+VERSION="2.4.1"
 threads=20
 debug=0
 genome=""
@@ -212,7 +212,7 @@ echo "R1 samples: $n_r1"
 echo -e "\n=== 步骤1: 参考索引（先验再用，禁止无故重建）==="
 hisat_x=""
 if [[ -n "$index_prefix" ]]; then
-  index_prefix=$(realpath "$index_prefix")
+  index_prefix=$(realpath -s "$index_prefix")
   if index_ok "$index_prefix"; then
     hisat_x="$index_prefix"
     echo "使用外部索引: $hisat_x"
