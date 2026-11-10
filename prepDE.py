@@ -1,4 +1,6 @@
 #!/usr/bin/env python2
+# LEGACY: 仅供 StringTie 路线（post_stringtie.sh）使用，依赖 python2。
+# 新项目主矩阵请使用 09.featureCounts（counts_to_fpkm_tpm.py，python3）。
 import re, csv, sys, os, glob, warnings, itertools
 from math import ceil
 from optparse import OptionParser

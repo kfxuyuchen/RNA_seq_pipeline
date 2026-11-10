@@ -1,5 +1,13 @@
 # Changelog
 
+## 5.4.1 — 2026-11-10
+
+### Refactor（不改变任何默认行为）
+- **编排移出核心**：SLURM 模板与提交脚本移至 `orchestration/`；`templates/` 保留兼容软链。
+- **文档分层**：`docs/QUICKSTART.md`、`docs/PARAMETERS.md`、`docs/LEGACY.md`、`docs/ORCHESTRATION.md`；README 精简为总览 + 快速开始。
+- **标注 legacy**：`getTPM.py` / `getFPKM.py` / `prepDE.py` / `post_stringtie.sh` 头部注明仅用于可选 StringTie 路线。
+- 未修改任何脚本参数、默认值或输出格式。
+
 ## 5.4.0 — 2026-11-10
 
 ### Highlights

@@ -1,4 +1,6 @@
 #!/bin/bash
+# LEGACY: StringTie 路线（可选）。主矩阵请用 09.featureCounts。
+# 依赖 python2 的 prepDE/getTPM/getFPKM；详见 docs/LEGACY.md。
 # StringTie post-quant with resume: skip samples that already have assemble.gtf;
 # matrices rebuilt only when needed (or --force).
 set -euo pipefail
