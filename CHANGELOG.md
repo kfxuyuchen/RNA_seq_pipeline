@@ -1,5 +1,16 @@
 # Changelog
 
+## 5.5.0 — 2026-11-10
+
+### Highlights
+- **可选关闭 `--mm`**：新增环境变量 `HISAT2_MM`（默认 1）与 `RNA_seq_run_dual.sh --no-mmap`。
+  GPFS 上 `--mm` 会导致 hisat2 大量页错误、CPU 利用率仅约 1 核；关掉后索引常驻内存，速度明显提升。
+- 默认行为不变（仍使用 `--mm`）。
+
+### Component versions
+- `RNA_seq_run_dual.sh` **5.5.0**
+- `map_only.sh` **2.6.0**
+
 ## 5.4.2 — 2026-11-10
 
 ### Cleanup（减法）

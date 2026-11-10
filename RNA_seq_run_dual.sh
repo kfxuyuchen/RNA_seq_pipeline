@@ -47,6 +47,7 @@ mapq_min_override=""
 keep_multimap=0
 hisat2_extra_override=""
 samtools_threads_override=""
+no_mmap=0
 
 
 # featureCounts passthrough
@@ -109,6 +110,7 @@ Usage:
   --keep-multimap        保留多重比对（默认只保留 NH:i:1）
   --hisat2-extra "ARGS"  追加给 hisat2 的参数，如 "--max-intronlen 5000"
   --samtools-threads N   samtools view/sort 线程（默认 min(threads,4)；内存≈N×SAMTOOLS_SORT_MEM）
+  --no-mmap              不使用 --mm（索引读入内存；GPFS 上通常更快，内存约 25–30 GB/进程）
 
 ──────────────── featureCounts 透传 ────────────────
   -s, --strand 0|1|2     链特异（默认: ${fc_strand}）
@@ -187,6 +189,7 @@ while [[ $# -gt 0 ]]; do
     --keep-multimap) keep_multimap=1; shift ;;
     --hisat2-extra) hisat2_extra_override="$2"; shift 2 ;;
     --samtools-threads) samtools_threads_override="$2"; shift 2 ;;
+    --no-mmap) no_mmap=1; shift ;;
     -s|--strand) fc_strand="$2"; shift 2 ;;
     -Q|--mapq) fc_mapq="$2"; shift 2 ;;
     --fc-feature) fc_feature="$2"; shift 2 ;;
@@ -291,6 +294,7 @@ if [[ "$skip_map" -eq 0 ]]; then
   [[ "$keep_multimap" -eq 1 ]] && export UNIQUE_ONLY=0
   [[ -n "$hisat2_extra_override" ]] && export HISAT2_EXTRA="$hisat2_extra_override"
   [[ -n "$samtools_threads_override" ]] && export SAMTOOLS_THREADS="$samtools_threads_override"
+  [[ "$no_mmap" -eq 1 ]] && export HISAT2_MM=0
   map_args=(-G "$genome" -T "$transdb" -p "$threads"
             --r1-suffix "$R1_SUFFIX" --r2-suffix "$R2_SUFFIX" --r1-glob "$R1_GLOB")
   [[ -n "$tiegff" ]] && map_args+=(-t "$tiegff")

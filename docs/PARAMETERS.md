@@ -36,8 +36,9 @@
 | `--keep-multimap` | 保留多重比对 | 关（只留 NH:i:1） |
 | `--hisat2-extra` | 追加 HISAT2 参数 | 无 |
 | `--samtools-threads` | view/sort 线程 | `min(-p,4)` |
+| `--no-mmap` | 索引读入内存（GPFS 更快） | 关（默认 `--mm`） |
 
-环境变量：`MAPQ_MIN`、`UNIQUE_ONLY`、`HISAT2_EXTRA`、`SAMTOOLS_THREADS`、`SAMTOOLS_SORT_MEM`。
+环境变量：`MAPQ_MIN`、`UNIQUE_ONLY`、`HISAT2_EXTRA`、`HISAT2_MM`、`SAMTOOLS_THREADS`、`SAMTOOLS_SORT_MEM`。
 
 ## FASTQ 命名
 

@@ -8,7 +8,7 @@ PIPELINE_DIR="$(cd "$(dirname "$0")" && pwd)"
 # shellcheck source=pipeline_common.sh
 source "${PIPELINE_DIR}/pipeline_common.sh"
 
-VERSION="2.5.0"
+VERSION="2.6.0"
 threads=20
 only_samples=""
 sample_list_file=""
@@ -65,6 +65,7 @@ FASTQ 命名（提高跨项目兼容性）:
   MAPQ_MIN              唯一比对最低 MAPQ（默认: 10）
   UNIQUE_ONLY           1=只保留 NH:i:1（默认），0=保留多重比对
   HISAT2_EXTRA         追加给 hisat2 的额外参数（如 "--max-intronlen 5000"）
+  HISAT2_MM            1=--mm（默认，省内存）；0=索引读入内存（GPFS 上通常更快）
   HISAT2_INDEX           同 -x（命令行优先）
 
 输出（编号连续）:
@@ -127,6 +128,9 @@ sort_mem="${SAMTOOLS_SORT_MEM:-1G}"
 mapq_min="${MAPQ_MIN:-10}"
 unique_only="${UNIQUE_ONLY:-1}"
 hisat2_extra="${HISAT2_EXTRA:-}"
+hisat2_mm="${HISAT2_MM:-1}"
+mm_opt=""
+[[ "$hisat2_mm" -eq 1 ]] && mm_opt="--mm"
 if [[ "$unique_only" -eq 1 ]]; then
   unique_awk='BEGIN{FS=OFS="\t"} /^@/ || $0 ~ /NH:i:1($|\t)/'
 else
@@ -324,7 +328,7 @@ while IFS= read -r id; do
         atomic_mv "${raw_bam}.tmp" "$raw_bam"
       else
         echo "  [debug] hisat2 → raw BAM [-p ${threads}, --dta --mm]"
-        hisat2 -x "$hisat_x" -p "$threads" $hisat2_extra \
+        hisat2 -x "$hisat_x" -p "$threads" $hisat2_extra $mm_opt \
           --dta --mm \
           --fr -1 "$id" -2 "$id2" \
           2> "$hisat_log" \
@@ -359,7 +363,7 @@ while IFS= read -r id; do
           samtools view -bS -@"${sam_threads}" "$legacy_sam" > "${raw_bam}.tmp"
           atomic_mv "${raw_bam}.tmp" "$raw_bam"
         else
-          hisat2 -x "$hisat_x" -p "$threads" $hisat2_extra --dta --mm --fr -1 "$id" -2 "$id2" \
+          hisat2 -x "$hisat_x" -p "$threads" $hisat2_extra --dta $mm_opt --fr -1 "$id" -2 "$id2" \
             2> "$hisat_log" | samtools view -@"${sam_threads}" -bS - > "${raw_bam}.tmp"
           atomic_mv "${raw_bam}.tmp" "$raw_bam"
         fi
@@ -377,7 +381,7 @@ while IFS= read -r id; do
     else
       echo "  hisat2 | unique | sort → $sorted_bam [-p ${threads}, --dta --mm]"
       # shellcheck disable=SC2094
-      hisat2 -x "$hisat_x" -p "$threads" $hisat2_extra \
+      hisat2 -x "$hisat_x" -p "$threads" $hisat2_extra $mm_opt \
         --dta --mm \
         --fr -1 "$id" -2 "$id2" \
         2> "$hisat_log" \
