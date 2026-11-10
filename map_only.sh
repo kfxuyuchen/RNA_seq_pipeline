@@ -8,7 +8,7 @@ PIPELINE_DIR="$(cd "$(dirname "$0")" && pwd)"
 # shellcheck source=pipeline_common.sh
 source "${PIPELINE_DIR}/pipeline_common.sh"
 
-VERSION="2.6.0"
+VERSION="2.7.0"
 threads=20
 only_samples=""
 sample_list_file=""
@@ -56,6 +56,7 @@ FASTQ 命名（提高跨项目兼容性）:
   --r1-suffix STR        R1 后缀 (默认: ${R1_SUFFIX})
   --r2-suffix STR        R2 后缀 (默认: ${R2_SUFFIX})
   --r1-glob  GLOB        在 -T 目录下查找 R1 的 glob (默认: ${R1_GLOB})
+  --se-glob  GLOB        单端 clean FASTQ 的 glob (默认: ${SE_GLOB})
 
   默认兼容本实验室 *clean_1.fastq.gz / *clean_2.fastq.gz。
 
@@ -97,6 +98,7 @@ while [[ $# -gt 0 ]]; do
     --r1-suffix) R1_SUFFIX="$2"; shift 2 ;;
     --r2-suffix) R2_SUFFIX="$2"; shift 2 ;;
     --r1-glob) R1_GLOB="$2"; shift 2 ;;
+    --se-glob) SE_GLOB="$2"; shift 2 ;;
     -h|--help) usage ;;
     *) echo "未知选项: $1" >&2; usage ;;
   esac
@@ -129,6 +131,8 @@ mapq_min="${MAPQ_MIN:-10}"
 unique_only="${UNIQUE_ONLY:-1}"
 hisat2_extra="${HISAT2_EXTRA:-}"
 hisat2_mm="${HISAT2_MM:-1}"
+SE_GLOB="${SE_GLOB:-*_clean.fastq.gz}"
+SE_SUFFIX="${SE_SUFFIX:-_clean.fastq.gz}"
 mm_opt=""
 [[ "$hisat2_mm" -eq 1 ]] && mm_opt="--mm"
 if [[ "$unique_only" -eq 1 ]]; then
@@ -204,16 +208,17 @@ maybe_index_bam_csi() {
   fi
 }
 
-trans_files=$(find_r1_files "$transdb")
+trans_files=$({ find "$transdb" -maxdepth 1 -name "$R1_GLOB" -print; find "$transdb" -maxdepth 1 -name "$SE_GLOB" -print; } | sort -u)
 [[ -n "$trans_files" ]] || {
-  echo "ERROR: no files matching R1_GLOB='$R1_GLOB' in $transdb" >&2
+  echo "ERROR: no files matching R1_GLOB='$R1_GLOB' or SE_GLOB='$SE_GLOB' in $transdb" >&2
   echo "  hint: set --r1-glob / --r1-suffix to match your FASTQ names" >&2
   exit 1
 }
 
-# PE mate preflight
+# PE mate preflight（SE 文件跳过）
 while IFS= read -r id; do
   [[ -n "$id" ]] || continue
+  [[ "$(basename "$id")" == *"$R1_SUFFIX" ]] || continue
   id2=$(fq_mate_path "$id") || exit 1
   [[ -f "$id2" ]] || { echo "ERROR: missing mate for $(basename "$id"): $id2" >&2; exit 1; }
 done <<< "$trans_files"
@@ -279,7 +284,14 @@ n_done=0
 n_fail_clean=0
 while IFS= read -r id; do
   [[ -n "$id" ]] || continue
-  sample_name=$(fq_sample_name "$id") || exit 1
+  _base=$(basename "$id")
+  if [[ "$_base" == *"$R1_SUFFIX" ]]; then
+    sample_name="${_base%$R1_SUFFIX}"
+  elif [[ "$_base" == *"$SE_SUFFIX" ]]; then
+    sample_name="${_base%.fastq.gz}"
+  else
+    echo "ERROR: cannot derive sample name from $_base" >&2; exit 1
+  fi
   if [[ -n "$only_filter" ]]; then
     _base="${sample_name%_clean}"
     case ",${only_filter}," in
@@ -314,8 +326,14 @@ while IFS= read -r id; do
 
   echo "处理样本: $sample_name"
   rm -f "${raw_bam}.tmp" "${unique_bam}.tmp" "${sorted_bam}.tmp"
-  id2=$(fq_mate_path "$id") || exit 1
-  [[ -f "$id2" ]] || { echo "ERROR: missing mate $id2" >&2; exit 1; }
+  id2=""
+  if [[ "$_base" == *"$R1_SUFFIX" ]]; then
+    id2=$(fq_mate_path "$id") || exit 1
+    [[ -f "$id2" ]] || { echo "ERROR: missing mate $id2" >&2; exit 1; }
+    input_args=(--fr -1 "$id" -2 "$id2")
+  else
+    input_args=(-U "$id")
+  fi
 
   if [[ "$debug" -eq 1 ]]; then
     # Legacy multi-write path (02 intermediates kept)
@@ -330,7 +348,7 @@ while IFS= read -r id; do
         echo "  [debug] hisat2 → raw BAM [-p ${threads}, --dta --mm]"
         hisat2 -x "$hisat_x" -p "$threads" $hisat2_extra $mm_opt \
           --dta \
-          --fr -1 "$id" -2 "$id2" \
+          "${input_args[@]}" \
           2> "$hisat_log" \
           | samtools view -@"${sam_threads}" -bS - > "${raw_bam}.tmp"
         atomic_mv "${raw_bam}.tmp" "$raw_bam"
@@ -363,7 +381,7 @@ while IFS= read -r id; do
           samtools view -bS -@"${sam_threads}" "$legacy_sam" > "${raw_bam}.tmp"
           atomic_mv "${raw_bam}.tmp" "$raw_bam"
         else
-          hisat2 -x "$hisat_x" -p "$threads" $hisat2_extra --dta $mm_opt --fr -1 "$id" -2 "$id2" \
+          hisat2 -x "$hisat_x" -p "$threads" $hisat2_extra --dta $mm_opt "${input_args[@]}" \
             2> "$hisat_log" | samtools view -@"${sam_threads}" -bS - > "${raw_bam}.tmp"
           atomic_mv "${raw_bam}.tmp" "$raw_bam"
         fi
@@ -383,7 +401,7 @@ while IFS= read -r id; do
       # shellcheck disable=SC2094
       hisat2 -x "$hisat_x" -p "$threads" $hisat2_extra $mm_opt \
         --dta \
-        --fr -1 "$id" -2 "$id2" \
+        "${input_args[@]}" \
         2> "$hisat_log" \
         | samtools view -h -q "$mapq_min" -@"${sam_threads}" - \
         | awk "$unique_awk" \

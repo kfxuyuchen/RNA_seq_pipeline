@@ -1,0 +1,17 @@
+task=1 sample=CRR1143996 node=c001 threads=8
+=== MAP-ONLY v2.6.0 ===
+genome=/scratch/share/taoyongfu/xuyuchen/data/ref_genome/Wheat_CS_ref/3CS_IAAS_T2T/raw_data/CS-IAAS_v1.1.fa
+fastq=/public/home/xuyuchen/data/RNA-seq_public/01.public1/15.official/batch_Li2026/clean_fastq
+R1_GLOB=*clean_1.fastq.gz  R1_SUFFIX=_1.fastq.gz  R2_SUFFIX=_2.fastq.gz
+threads=8 sort_mem=1G force=0 debug=0 index_bam=0
+mode=onewrite-pipe
+cwd=/public/home/xuyuchen/data/RNA-seq_public/01.public1/15.official/batch_Li2026/quant
+R1 samples: 6
+
+=== 步骤1: 参考索引（先验再用，禁止无故重建）===
+使用外部索引: /public/home/xuyuchen/01.scratch_home/data/Wheat_RNA_Seq/wheat_T2T/rnaseq_quant_T2T/01.ref/CS-IAAS_v1.1.fa
+
+=== 步骤2: 比对 / 筛选 / 排序（可续传）===
+处理样本: CRR1143996_clean
+  hisat2 | unique | sort → 03.stringtie_sort/CRR1143996_clean_sorted.bam [-p 8, --dta --mm]
+slurmstepd: error: *** JOB 5634322 ON c001 CANCELLED AT 2026-11-10T13:19:40 ***

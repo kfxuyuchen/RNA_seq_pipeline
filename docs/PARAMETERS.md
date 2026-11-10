@@ -47,6 +47,7 @@
 | `--r1-suffix` | R1 后缀 | `_1.fastq.gz` |
 | `--r2-suffix` | R2 后缀 | `_2.fastq.gz` |
 | `--r1-glob` | R1 glob | `*clean_1.fastq.gz` |
+| `--se-glob` | 单端 clean glob | `*_clean.fastq.gz` |
 
 ## featureCounts 透传
 

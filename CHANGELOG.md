@@ -1,5 +1,18 @@
 # Changelog
 
+## 5.6.0 — 2026-11-10
+
+### Highlights
+- **单端（SE）支持**：`map_only.sh` 自动识别 SE clean FASTQ（默认 `*_clean.fastq.gz`），使用 `hisat2 -U`，沿用同一套 MAPQ/NH:i:1 过滤与排序。
+- `fastp_qc.sh` 支持 SE：`<sample>.fastq.gz → <sample>_clean.fastq.gz`。
+- `RNA_seq_run_dual.sh --se-glob` 透传 SE glob。
+- PE 行为与命名完全不变；SE BAM 命名为 `<sample>_clean_sorted.bam`，与 PE 列名风格一致。
+
+### Component versions
+- `RNA_seq_run_dual.sh` **5.6.0**
+- `map_only.sh` **2.7.0**
+- `fastp_qc.sh` **1.2.0**
+
 ## 5.5.0 — 2026-11-10
 
 ### Highlights
