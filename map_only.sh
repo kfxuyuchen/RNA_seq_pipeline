@@ -8,7 +8,7 @@ PIPELINE_DIR="$(cd "$(dirname "$0")" && pwd)"
 # shellcheck source=pipeline_common.sh
 source "${PIPELINE_DIR}/pipeline_common.sh"
 
-VERSION="2.4.2"
+VERSION="2.4.3"
 threads=20
 debug=0
 genome=""
@@ -56,6 +56,7 @@ FASTQ 命名（提高跨项目兼容性）:
 
 环境变量:
   SAMTOOLS_SORT_MEM      samtools sort -m (默认: 1G)
+  SAMTOOLS_THREADS       samtools view/sort -@（默认: min(threads,4)；内存≈线程×-m）
   MAPQ_MIN              唯一比对最低 MAPQ（默认: 10）
   UNIQUE_ONLY           1=只保留 NH:i:1（默认），0=保留多重比对
   HISAT2_EXTRA         追加给 hisat2 的额外参数（如 "--max-intronlen 5000"）
@@ -104,8 +105,10 @@ if [[ -z "$index_prefix" && -n "${HISAT2_INDEX:-}" ]]; then
   index_prefix="$HISAT2_INDEX"
 fi
 
-sam_threads=$(( threads > 4 ? 4 : threads ))
-sort_threads=$(( threads > 4 ? 4 : threads ))
+# samtools 线程默认仍封顶 4（历史内存考虑）；可用 SAMTOOLS_THREADS 覆盖。
+# 注意 sort 内存 ≈ SAMTOOLS_THREADS × SAMTOOLS_SORT_MEM。
+sam_threads="${SAMTOOLS_THREADS:-$(( threads > 4 ? 4 : threads ))}"
+sort_threads="$sam_threads"
 sort_mem="${SAMTOOLS_SORT_MEM:-1G}"
 mapq_min="${MAPQ_MIN:-10}"
 unique_only="${UNIQUE_ONLY:-1}"

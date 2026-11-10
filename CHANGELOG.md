@@ -1,5 +1,16 @@
 # Changelog
 
+## 5.3.0 — 2026-11-10
+
+### Highlights
+- **samtools 线程可外部配置**：新增环境变量 `SAMTOOLS_THREADS` 与 `RNA_seq_run_dual.sh --samtools-threads N`。
+- 默认仍为 `min(-p, 4)`，保持历史行为与内存占用；只有显式传参才放大。
+- 文档补充内存估算：`samtools sort` 内存 ≈ `SAMTOOLS_THREADS × SAMTOOLS_SORT_MEM`。
+
+### Component versions
+- `RNA_seq_run_dual.sh` **5.3.0**
+- `map_only.sh` **2.4.3**
+
 ## 5.2.0 — 2026-11-10
 
 ### Highlights

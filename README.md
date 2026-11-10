@@ -58,6 +58,9 @@ bash RNA_seq_run_dual.sh ... --mapq-min 20
 bash RNA_seq_run_dual.sh ... --hisat2-extra "--max-intronlen 5000"
 ```
 
+`samtools sort` 的内存估算：**线程数 × `-m`**。例如 `--samtools-threads 8` + `SAMTOOLS_SORT_MEM=2G` 约 16 GB。
+默认仍是 `min(-p, 4)` × `1G`，保持历史内存行为。
+
 也可直接设环境变量调用 `map_only.sh`：
 
 ```bash
@@ -73,6 +76,7 @@ MAPQ_MIN=20 UNIQUE_ONLY=0 HISAT2_EXTRA="--max-intronlen 5000" \
 | 链特异 | `-s 0/1/2` |
 | featureCounts MAPQ | `-Q N` |
 | 特征类型/属性 | `--fc-feature` / `--fc-attr` |
+| samtools view/sort 线程 | `--samtools-threads N` 或环境变量 `SAMTOOLS_THREADS` |
 | samtools sort 内存 | 环境变量 `SAMTOOLS_SORT_MEM` |
 | fastp 参数 | `--fastp-min-qual` / `--fastp-min-len` / `--fastp-compression` / `--no-detect-adapter` |
 
