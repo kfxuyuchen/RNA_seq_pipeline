@@ -142,8 +142,22 @@ if [[ "$skip_preflight" -eq 0 ]]; then
     -t "$feature_type"
 fi
 
+# Detect library layout: SE BAMs must not use -p
+has_pe=0; has_se=0
+for b in "${bams[@]}"; do
+  paired=$(samtools flagstat "$b" 2>/dev/null | awk '/paired in sequencing/{print $1; exit}')
+  if [[ "${paired:-0}" -gt 0 ]]; then has_pe=1; else has_se=1; fi
+done
+if [[ "$has_pe" -eq 1 && "$has_se" -eq 1 ]]; then
+  echo "ERROR: 混合了 PE 和 SE BAM；请分别建目录定量（per-sample 目录应为单一 layout）" >&2
+  exit 1
+fi
+
 fc_help=$(featureCounts -h 2>&1 || true)
-if grep -q -- '--countReadPairs' <<<"$fc_help"; then
+if [[ "$has_se" -eq 1 ]]; then
+  fc_extra=()
+  echo "NOTE: single-end BAM detected; 不使用 -p/--countReadPairs"
+elif grep -q -- '--countReadPairs' <<<"$fc_help"; then
   fc_extra=(-p --countReadPairs)
 else
   fc_extra=(-p)

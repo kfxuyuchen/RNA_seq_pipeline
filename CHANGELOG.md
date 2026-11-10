@@ -1,5 +1,12 @@
 # Changelog
 
+## 5.6.1 — 2026-11-10
+
+### Fixes
+- `post_featurecounts.sh` 自动识别单端 BAM：SE 时不再传 `-p/--countReadPairs`。
+  修复 SE 样本定量时报错 `No paired-end reads were detected in paired-end read library`。
+- 混合 PE/SE BAM 的目录会明确报错，提示分开定量。
+
 ## 5.6.0 — 2026-11-10
 
 ### Highlights
