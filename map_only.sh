@@ -8,7 +8,7 @@ PIPELINE_DIR="$(cd "$(dirname "$0")" && pwd)"
 # shellcheck source=pipeline_common.sh
 source "${PIPELINE_DIR}/pipeline_common.sh"
 
-VERSION="2.4.1"
+VERSION="2.4.2"
 threads=20
 debug=0
 genome=""
@@ -56,6 +56,9 @@ FASTQ 命名（提高跨项目兼容性）:
 
 环境变量:
   SAMTOOLS_SORT_MEM      samtools sort -m (默认: 1G)
+  MAPQ_MIN              唯一比对最低 MAPQ（默认: 10）
+  UNIQUE_ONLY           1=只保留 NH:i:1（默认），0=保留多重比对
+  HISAT2_EXTRA         追加给 hisat2 的额外参数（如 "--max-intronlen 5000"）
   HISAT2_INDEX           同 -x（命令行优先）
 
 输出（编号连续）:
@@ -104,6 +107,14 @@ fi
 sam_threads=$(( threads > 4 ? 4 : threads ))
 sort_threads=$(( threads > 4 ? 4 : threads ))
 sort_mem="${SAMTOOLS_SORT_MEM:-1G}"
+mapq_min="${MAPQ_MIN:-10}"
+unique_only="${UNIQUE_ONLY:-1}"
+hisat2_extra="${HISAT2_EXTRA:-}"
+if [[ "$unique_only" -eq 1 ]]; then
+  unique_awk='BEGIN{FS=OFS="\t"} /^@/ || $0 ~ /NH:i:1($|\t)/'
+else
+  unique_awk='BEGIN{FS=OFS="\t"} /^@/ || 1'
+fi
 
 bam_ok() {
   local f="$1"
@@ -289,7 +300,7 @@ while IFS= read -r id; do
         atomic_mv "${raw_bam}.tmp" "$raw_bam"
       else
         echo "  [debug] hisat2 → raw BAM [-p ${threads}, --dta --mm]"
-        hisat2 -x "$hisat_x" -p "$threads" \
+        hisat2 -x "$hisat_x" -p "$threads" $hisat2_extra \
           --dta --mm \
           --fr -1 "$id" -2 "$id2" \
           2> "$hisat_log" \
@@ -304,8 +315,8 @@ while IFS= read -r id; do
     else
       rm -f "$unique_bam"
       echo "  [debug] 筛选 unique → BAM"
-      samtools view -h -q 10 -@"${sam_threads}" "$raw_bam" | \
-        awk 'BEGIN{FS=OFS="\t"} /^@/ || $0 ~ /NH:i:1($|\t)/' | \
+      samtools view -h -q "$mapq_min" -@"${sam_threads}" "$raw_bam" | \
+        awk "$unique_awk" | \
         samtools view -bS -@"${sam_threads}" - > "${unique_bam}.tmp"
       atomic_mv "${unique_bam}.tmp" "$unique_bam"
     fi
@@ -324,15 +335,15 @@ while IFS= read -r id; do
           samtools view -bS -@"${sam_threads}" "$legacy_sam" > "${raw_bam}.tmp"
           atomic_mv "${raw_bam}.tmp" "$raw_bam"
         else
-          hisat2 -x "$hisat_x" -p "$threads" --dta --mm --fr -1 "$id" -2 "$id2" \
+          hisat2 -x "$hisat_x" -p "$threads" $hisat2_extra --dta --mm --fr -1 "$id" -2 "$id2" \
             2> "$hisat_log" | samtools view -@"${sam_threads}" -bS - > "${raw_bam}.tmp"
           atomic_mv "${raw_bam}.tmp" "$raw_bam"
         fi
       fi
       if ! bam_ok "$unique_bam"; then
         rm -f "$unique_bam"
-        samtools view -h -q 10 -@"${sam_threads}" "$raw_bam" | \
-          awk 'BEGIN{FS=OFS="\t"} /^@/ || $0 ~ /NH:i:1($|\t)/' | \
+        samtools view -h -q "$mapq_min" -@"${sam_threads}" "$raw_bam" | \
+          awk "$unique_awk" | \
           samtools view -bS -@"${sam_threads}" - > "${unique_bam}.tmp"
         atomic_mv "${unique_bam}.tmp" "$unique_bam"
       fi
@@ -342,12 +353,12 @@ while IFS= read -r id; do
     else
       echo "  hisat2 | unique | sort → $sorted_bam [-p ${threads}, --dta --mm]"
       # shellcheck disable=SC2094
-      hisat2 -x "$hisat_x" -p "$threads" \
+      hisat2 -x "$hisat_x" -p "$threads" $hisat2_extra \
         --dta --mm \
         --fr -1 "$id" -2 "$id2" \
         2> "$hisat_log" \
-        | samtools view -h -q 10 -@"${sam_threads}" - \
-        | awk 'BEGIN{FS=OFS="\t"} /^@/ || $0 ~ /NH:i:1($|\t)/' \
+        | samtools view -h -q "$mapq_min" -@"${sam_threads}" - \
+        | awk "$unique_awk" \
         | samtools sort -m "${sort_mem}" -@"${sort_threads}" -o "${sorted_bam}.tmp" -
       pipe_rc=( "${PIPESTATUS[@]}" )
       # hisat2=0, view=1, awk=2, sort=3

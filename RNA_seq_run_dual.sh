@@ -14,7 +14,7 @@ PIPELINE_DIR="$(cd "$(dirname "$0")" && pwd)"
 # shellcheck source=pipeline_common.sh
 source "${PIPELINE_DIR}/pipeline_common.sh"
 
-VERSION="5.1.0"
+VERSION="5.2.0"
 
 threads=12
 debug=0
@@ -41,6 +41,12 @@ fastp_compression=4
 fastp_detect_adapter=1
 fastp_remove_raw=0
 fastp_script="${PIPELINE_DIR}/fastp_qc.sh"
+
+# mapping filter / hisat2 extras (empty = pipeline defaults)
+mapq_min_override=""
+keep_multimap=0
+hisat2_extra_override=""
+
 
 # featureCounts passthrough
 fc_strand=0
@@ -96,6 +102,11 @@ Usage:
   --fastp-compression N  gzip 级别（默认: 4）
   --no-detect-adapter    关闭 PE 自动接头检测
   --fastp-remove-raw     fastp 成功后删除 raw FASTQ（默认保留）
+
+──────────────── 比对过滤 / HISAT2 透传 ────────────────
+  --mapq-min N           唯一比对最低 MAPQ（默认: 10）
+  --keep-multimap        保留多重比对（默认只保留 NH:i:1）
+  --hisat2-extra "ARGS"  追加给 hisat2 的参数，如 "--max-intronlen 5000"
 
 ──────────────── featureCounts 透传 ────────────────
   -s, --strand 0|1|2     链特异（默认: ${fc_strand}）
@@ -170,6 +181,9 @@ while [[ $# -gt 0 ]]; do
     --fastp-compression) fastp_compression="$2"; shift 2 ;;
     --no-detect-adapter) fastp_detect_adapter=0; shift ;;
     --fastp-remove-raw) fastp_remove_raw=1; shift ;;
+    --mapq-min) mapq_min_override="$2"; shift 2 ;;
+    --keep-multimap) keep_multimap=1; shift ;;
+    --hisat2-extra) hisat2_extra_override="$2"; shift 2 ;;
     -s|--strand) fc_strand="$2"; shift 2 ;;
     -Q|--mapq) fc_mapq="$2"; shift 2 ;;
     --fc-feature) fc_feature="$2"; shift 2 ;;
@@ -270,6 +284,9 @@ if [[ "$use_fastp" -eq 1 && "$skip_map" -eq 0 ]]; then
 fi
 
 if [[ "$skip_map" -eq 0 ]]; then
+  [[ -n "$mapq_min_override" ]] && export MAPQ_MIN="$mapq_min_override"
+  [[ "$keep_multimap" -eq 1 ]] && export UNIQUE_ONLY=0
+  [[ -n "$hisat2_extra_override" ]] && export HISAT2_EXTRA="$hisat2_extra_override"
   map_args=(-G "$genome" -T "$transdb" -p "$threads"
             --r1-suffix "$R1_SUFFIX" --r2-suffix "$R2_SUFFIX" --r1-glob "$R1_GLOB")
   [[ -n "$tiegff" ]] && map_args+=(-t "$tiegff")

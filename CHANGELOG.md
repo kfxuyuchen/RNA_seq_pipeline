@@ -1,5 +1,17 @@
 # Changelog
 
+## 5.2.0 — 2026-11-10
+
+### Highlights
+- **比对过滤参数外部可配**：`map_only.sh` 新增环境变量 `MAPQ_MIN`（默认 10）、`UNIQUE_ONLY`（默认 1）、`HISAT2_EXTRA`。
+- `RNA_seq_run_dual.sh` 新增同名命令行入口：`--mapq-min N`、`--keep-multimap`、`--hisat2-extra "ARGS"`。
+- 默认值保持不变，与 252 样本项目口径完全一致，仅提供可选覆盖。
+
+### Component versions
+- `RNA_seq_run_dual.sh` **5.2.0**
+- `map_only.sh` **2.4.2**
+- `fastp_qc.sh` **1.0.0**
+
 ## 5.1.0 — 2026-11-10
 
 ### Highlights

@@ -43,6 +43,39 @@ clean PE FASTQ
 ---
 
 
+## 参数覆盖（v5.2.0+）
+
+默认口径与 252 样本项目一致；需要改变时不必改脚本，直接外部传参：
+
+```bash
+# 保留多重比对
+bash RNA_seq_run_dual.sh ... --keep-multimap
+
+# 改最低 MAPQ
+bash RNA_seq_run_dual.sh ... --mapq-min 20
+
+# 给 hisat2 追加参数
+bash RNA_seq_run_dual.sh ... --hisat2-extra "--max-intronlen 5000"
+```
+
+也可直接设环境变量调用 `map_only.sh`：
+
+```bash
+MAPQ_MIN=20 UNIQUE_ONLY=0 HISAT2_EXTRA="--max-intronlen 5000" \
+  bash map_only.sh -G genome.fa -T clean_fastq -p 24
+```
+
+其它常用覆盖：
+
+| 需求 | 入口 |
+|---|---|
+| 线程 | `-p N` |
+| 链特异 | `-s 0/1/2` |
+| featureCounts MAPQ | `-Q N` |
+| 特征类型/属性 | `--fc-feature` / `--fc-attr` |
+| samtools sort 内存 | 环境变量 `SAMTOOLS_SORT_MEM` |
+| fastp 参数 | `--fastp-min-qual` / `--fastp-min-len` / `--fastp-compression` / `--no-detect-adapter` |
+
 ## 两种输入模式（v5.1.0+）
 
 | 模式 | 输入 | 命令 | 说明 |
