@@ -1,5 +1,19 @@
 # Changelog
 
+## 5.0.0 — 2026-11-10
+
+### Highlights
+- **内置 fastp 步骤**：新增 `fastp_qc.sh` v1.0.0，`RNA_seq_run_dual.sh --fastp` 可直接以 raw FASTQ 为输入，先 QC 再比对。
+- 固定实验室参数：`--detect_adapter_for_pe --qualified_quality_phred 20 --length_required 40 --compression 4`，与 252 样本项目一致。
+- 输出命名 `<sample>_clean_1/2.fastq.gz`，可被 `map_only.sh` 默认 `*clean_1.fastq.gz` 直接消费。
+- fastp 报告写入 `10.qc/fastp/`（json/html/log/unpaired），默认**不删除** raw FASTQ（`--fastp-remove-raw` 可显式开启）。
+- 兼容原有 clean-input 用法：不加 `--fastp` 时行为完全不变。
+
+### Component versions
+- `RNA_seq_run_dual.sh` **5.0.0**
+- `fastp_qc.sh` **1.0.0**
+- `map_only.sh` **2.4.0**
+
 ## 4.0.0 — 2026-10-29
 
 ### Highlights

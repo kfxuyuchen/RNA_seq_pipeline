@@ -42,6 +42,33 @@ clean PE FASTQ
 
 ---
 
+
+## 内置 fastp（v5.0.0+）
+
+如果手上只有 raw FASTQ，可以跳过外置 QC，直接用 `--fastp`：
+
+```bash
+bash RNA_seq_run_dual.sh \
+  -G genome.fa -T raw_fastq --fastp \
+  -a genes.gtf -m featurecounts \
+  -p 32 -x /path/to/hisat2_prefix
+```
+
+- fastp 固定参数与实验室 252 样本项目一致：
+  `--detect_adapter_for_pe --qualified_quality_phred 20 --length_required 40 --compression 4`
+- clean 输出：`00.clean_fastq/<sample>_clean_1/2.fastq.gz`
+- 报告：`10.qc/fastp/<sample>.fastp.{json,html,log}`
+- 默认保留 raw FASTQ；需要删除时加 `--fastp-remove-raw`
+- 不加 `--fastp` 时，行为与旧版完全一致（输入为 clean FASTQ）
+
+单独运行：
+
+```bash
+bash fastp_qc.sh -T raw_fastq -o 00.clean_fastq -j 10.qc/fastp -p 8
+```
+
+依赖：`fastp`（PATH 中可用，或设置 `FASTP=/path/to/fastp`）。
+
 ## 输出目录（01–10 连续）
 
 | 目录 | 内容 |

@@ -14,7 +14,7 @@ PIPELINE_DIR="$(cd "$(dirname "$0")" && pwd)"
 # shellcheck source=pipeline_common.sh
 source "${PIPELINE_DIR}/pipeline_common.sh"
 
-VERSION="4.0.0"
+VERSION="5.0.0"
 
 threads=12
 debug=0
@@ -29,6 +29,18 @@ index_bam=0
 skip_map=0
 run_qc=1
 min_hisat2=0
+
+# integrated fastp QC (optional)
+use_fastp=0
+fastp_dir=""
+fastp_report_dir=""
+fastp_threads=8
+fastp_min_qual=20
+fastp_min_len=40
+fastp_compression=4
+fastp_detect_adapter=1
+fastp_remove_raw=0
+fastp_script="${PIPELINE_DIR}/fastp_qc.sh"
 
 # featureCounts passthrough
 fc_strand=0
@@ -74,6 +86,17 @@ Usage:
   --r1-glob GLOB         默认: ${R1_GLOB}（实验室 clean 数据）
   例: --r1-suffix _1.fq.gz --r2-suffix _2.fq.gz --r1-glob '*_1.fq.gz'
 
+──────────────── 内置 fastp（可选）────────────────
+  --fastp                输入 -T 为 raw FASTQ，先跑 fastp（固定实验室参数）再比对
+  --fastp-dir DIR        clean FASTQ 输出目录（默认: <cwd>/00.clean_fastq）
+  --fastp-report-dir DIR fastp 报告目录（默认: <cwd>/10.qc/fastp）
+  --fastp-threads N      fastp 线程（默认: 8）
+  --fastp-min-qual N     合格碱基 Phred（默认: 20）
+  --fastp-min-len N      最短 read 长度（默认: 40）
+  --fastp-compression N  gzip 级别（默认: 4）
+  --no-detect-adapter    关闭 PE 自动接头检测
+  --fastp-remove-raw     fastp 成功后删除 raw FASTQ（默认保留）
+
 ──────────────── featureCounts 透传 ────────────────
   -s, --strand 0|1|2     链特异（默认: ${fc_strand}）
   -Q, --mapq N           最低 MAPQ（默认: ${fc_mapq}）
@@ -106,6 +129,9 @@ Usage:
   # BAM 已齐，只跑 featureCounts（反向链文库）
   bash $(basename "$0") -m quant-only -a genes.gtf -s 2 -p 32
 
+  # 从 raw FASTQ 开始，内置 fastp
+  bash $(basename "$0") -G genome.fa -T raw_fastq --fastp -a genes.gtf -m featurecounts -p 32
+
   # 自定义 FASTQ 后缀
   bash $(basename "$0") -G genome.fa -T fq -a genes.gtf -m featurecounts \\
     --r1-suffix _R1.fastq.gz --r2-suffix _R2.fastq.gz --r1-glob '*_R1.fastq.gz'
@@ -135,6 +161,15 @@ while [[ $# -gt 0 ]]; do
     --r1-suffix) R1_SUFFIX="$2"; shift 2 ;;
     --r2-suffix) R2_SUFFIX="$2"; shift 2 ;;
     --r1-glob) R1_GLOB="$2"; shift 2 ;;
+    --fastp) use_fastp=1; shift ;;
+    --fastp-dir) fastp_dir="$2"; shift 2 ;;
+    --fastp-report-dir) fastp_report_dir="$2"; shift 2 ;;
+    --fastp-threads) fastp_threads="$2"; shift 2 ;;
+    --fastp-min-qual) fastp_min_qual="$2"; shift 2 ;;
+    --fastp-min-len) fastp_min_len="$2"; shift 2 ;;
+    --fastp-compression) fastp_compression="$2"; shift 2 ;;
+    --no-detect-adapter) fastp_detect_adapter=0; shift ;;
+    --fastp-remove-raw) fastp_remove_raw=1; shift ;;
     -s|--strand) fc_strand="$2"; shift 2 ;;
     -Q|--mapq) fc_mapq="$2"; shift 2 ;;
     --fc-feature) fc_feature="$2"; shift 2 ;;
@@ -193,11 +228,30 @@ echo "RNA-seq dual v${VERSION}"
 echo "mode=$mode  threads=$threads  force=$force  cwd=$(pwd)"
 echo "st=$need_st  fc=$need_fc  skip_map=$skip_map  qc=$run_qc"
 echo "FQ: R1_GLOB=$R1_GLOB R1_SUFFIX=$R1_SUFFIX R2_SUFFIX=$R2_SUFFIX"
+[[ "$use_fastp" -eq 1 ]] && echo "fastp: ON  threads=$fastp_threads  min_qual=$fastp_min_qual  min_len=$fastp_min_len"
 if [[ "$need_fc" -eq 1 ]]; then
   echo "FC: strand=$fc_strand mapq=$fc_mapq feature=$fc_feature attr=$fc_attr"
 fi
 echo "Start: $(date)"
 echo "========================================"
+
+if [[ "$use_fastp" -eq 1 && "$skip_map" -eq 0 ]]; then
+  if [[ ! -x "$fastp_script" && ! -f "$fastp_script" ]]; then
+    echo "ERROR: missing fastp_qc.sh: $fastp_script" >&2; exit 1
+  fi
+  fastp_clean="${fastp_dir:-$(pwd)/00.clean_fastq}"
+  fastp_rep="${fastp_report_dir:-$(pwd)/10.qc/fastp}"
+  fp_args=(-T "$transdb" -o "$fastp_clean" -j "$fastp_rep" -p "$fastp_threads"
+           --min-qual "$fastp_min_qual" --min-len "$fastp_min_len"
+           --compression "$fastp_compression")
+  [[ "$fastp_detect_adapter" -eq 0 ]] && fp_args+=(--no-detect-adapter)
+  [[ "$fastp_remove_raw" -eq 1 ]] && fp_args+=(--remove-raw)
+  [[ "$force" -eq 1 ]] && fp_args+=(--force)
+  echo -e "\n########## fastp QC ##########"
+  bash "$fastp_script" "${fp_args[@]}"
+  transdb="$fastp_clean"
+  echo "fastp done → transdb=$transdb"
+fi
 
 if [[ "$skip_map" -eq 0 ]]; then
   map_args=(-G "$genome" -T "$transdb" -p "$threads"
