@@ -1,5 +1,14 @@
 # Changelog
 
+## 5.4.2 — 2026-11-10
+
+### Cleanup（减法）
+- 删除 `archive/`（旧版脚本，历史保留在 git）。
+- 删除 `templates/` 兼容软链；SLURM 模板统一使用 `orchestration/`。
+- 删除 `__pycache__/`（已在 `.gitignore`）。
+- README 同步移除兼容路径说明。
+- 不改变任何脚本行为与默认参数。
+
 ## 5.4.1 — 2026-11-10
 
 ### Refactor（不改变任何默认行为）

@@ -1,1 +1,0 @@
-../orchestration/submit_featurecounts_amd.slurm

@@ -66,7 +66,7 @@ cd /path/to/rnaseq_quant && bash RNA_seq_run_dual.sh -m quant-only -a annotation
 sbatch --array=0-N%8 --export=ALL orchestration/submit_map_array_amd.slurm
 ```
 
-见 [`docs/ORCHESTRATION.md`](docs/ORCHESTRATION.md)。SLURM 模板位于 `orchestration/`，`templates/` 保留兼容软链。
+见 [`docs/ORCHESTRATION.md`](docs/ORCHESTRATION.md)。SLURM 模板统一放在 `orchestration/`。
 
 ## 验收
 

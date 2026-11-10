@@ -1,1 +1,0 @@
-../orchestration/submit_map_amd.slurm
