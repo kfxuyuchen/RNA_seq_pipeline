@@ -1,5 +1,17 @@
 # Changelog
 
+## 5.1.0 — 2026-11-10
+
+### Highlights
+- **双输入模式显式化**：`RNA_seq_run_dual.sh` 启动时打印 `INPUT mode: clean` 或 `INPUT mode: raw → fastp`。
+- **输入自检**：未加 `--fastp` 却只找到 raw FASTQ，或加了 `--fastp` 却只找到 clean FASTQ 时给出告警，避免拿错目录。
+- 兼容两套工作习惯：raw reads 入口（`--fastp`）与 clean reads 入口（默认）共用同一套比对/定量逻辑。
+
+### Component versions
+- `RNA_seq_run_dual.sh` **5.1.0**
+- `fastp_qc.sh` **1.0.0**
+- `map_only.sh` **2.4.1**
+
 ## 5.0.1 — 2026-11-10
 
 ### Fixes

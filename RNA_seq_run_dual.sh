@@ -14,7 +14,7 @@ PIPELINE_DIR="$(cd "$(dirname "$0")" && pwd)"
 # shellcheck source=pipeline_common.sh
 source "${PIPELINE_DIR}/pipeline_common.sh"
 
-VERSION="5.0.0"
+VERSION="5.1.0"
 
 threads=12
 debug=0
@@ -234,6 +234,22 @@ if [[ "$need_fc" -eq 1 ]]; then
 fi
 echo "Start: $(date)"
 echo "========================================"
+
+if [[ "$skip_map" -eq 0 ]]; then
+  n_clean=$(find "$transdb" -maxdepth 1 -name '*clean_1.fastq.gz' | wc -l)
+  n_raw=$(find "$transdb" -maxdepth 1 -name '*_1.fastq.gz' ! -name '*clean_1.fastq.gz' | wc -l)
+  if [[ "$use_fastp" -eq 1 ]]; then
+    echo "INPUT mode: raw FASTQ → fastp → clean（找到 ${n_raw} 个 raw R1）"
+    if [[ "$n_raw" -eq 0 && "$n_clean" -gt 0 ]]; then
+      echo "WARN: 已加 --fastp，但目录里只有 clean FASTQ；会对 clean 再 trim 一次。" >&2
+    fi
+  else
+    echo "INPUT mode: clean FASTQ（fastp 关闭；找到 ${n_clean} 个 *clean_1.fastq.gz）"
+    if [[ "$n_clean" -eq 0 && "$n_raw" -gt 0 ]]; then
+      echo "WARN: 未加 --fastp，但目录里只有 raw FASTQ；如果这是 raw 数据，请加 --fastp。" >&2
+    fi
+  fi
+fi
 
 if [[ "$use_fastp" -eq 1 && "$skip_map" -eq 0 ]]; then
   if [[ ! -x "$fastp_script" && ! -f "$fastp_script" ]]; then

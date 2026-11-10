@@ -43,6 +43,24 @@ clean PE FASTQ
 ---
 
 
+## 两种输入模式（v5.1.0+）
+
+| 模式 | 输入 | 命令 | 说明 |
+|---|---|---|---|
+| clean | `*clean_1.fastq.gz` | 不加 `--fastp` | 与旧版行为一致；适合已经 QC 过的数据 |
+| raw | `*_1.fastq.gz` | 加 `--fastp` | 先 fastp 再比对；同一条命令完成 QC+定量 |
+
+启动时会打印当前模式，例如：
+
+```
+INPUT mode: raw FASTQ → fastp → clean（找到 6 个 raw R1）
+```
+
+如果目录内容与模式不匹配，会给出 `WARN`：
+
+- 没加 `--fastp` 但只有 raw 文件 → 提示加 `--fastp`；
+- 加了 `--fastp` 但只有 clean 文件 → 提示会二次 trim。
+
 ## 内置 fastp（v5.0.0+）
 
 如果手上只有 raw FASTQ，可以跳过外置 QC，直接用 `--fastp`：
